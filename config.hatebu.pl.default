@@ -1,0 +1,14 @@
+{
+  oauth => {
+    consumer_key => '',
+    consumer_secret => '',
+    access_token => '',
+    access_token_secret => '',
+  },
+  ngwords => [
+    'google',
+    'yahoo',
+    'b.hatena.ne.jp',
+  ],
+};
+

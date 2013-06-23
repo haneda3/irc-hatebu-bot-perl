@@ -1,0 +1,16 @@
+{
+  server => {
+    host => 'chat.au.freenode.net',
+    port => '6667',
+    nick => 'haneda3bot',
+    user => 'haneda3bot',
+    real => 'haneda3bot',
+  },
+  channels => {
+    test2x => {
+      password => 'tokoroten',
+    },
+    testhaneda => {},
+  },
+};
+
