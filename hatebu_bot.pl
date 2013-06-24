@@ -54,6 +54,11 @@ $irc->reg_cb(
 
         my $message = $msg->{params}->[1] // '';
 
+        if (get_delete_message($irc->nick, $message)) {
+            $irc->send_chan($channel, "NOTICE", $channel, "delete ok");
+            return;
+        }
+
         my $url = get_url_from_message($message);
         if ($url) {
             my $title = get_title_from_url($url);
@@ -73,7 +78,7 @@ $irc->reg_cb(
             $hatebu->init();
             my $result = $hatebu->post($url);
             if ($result) {
-                $irc->send_chan($channel, "NOTICE", $channel, "$SUCCESS_MSG $result->{post_url}");
+                $irc->send_chan($channel, "NOTICE", $channel, "$SUCCESS_MSG $result->{eid} $result->{post_url}");
             }
         }
     },
@@ -81,18 +86,28 @@ $irc->reg_cb(
     },
 );
 
-# 定期実行
-my $timer;
-$timer = AnyEvent->timer(
-    after    => 1, # 秒間まってからループ開始
-    interval => 2, # 秒数ごとにやる
-    cb       => sub {
-        #$irc->send_chan( $channel, "NOTICE", $channel, '完、じゃなくて凛！' );
-    }
-);
-
-
 $ac->recv;
+
+sub get_delete_message {
+    my ($nick, $message) = @_;
+
+    if ($message =~ /$nick:*\s+(\w+)\s+(\w+)/) {
+        my $command = $1;
+        my $id = $2;
+
+        if ($command =~ /delete/) {
+            my $hatebu = Hatebu->new($hatebu_oauth);
+            $hatebu->init();
+            my $result = $hatebu->delete($id);
+            if ($result) {
+                return 1;
+            }
+        }
+    }
+
+    return undef;
+}
+
 
 sub get_url_from_message {
   my ($url) = @_;

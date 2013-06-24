@@ -9,6 +9,10 @@ use Encode;
 use OAuth::Lite::Consumer;
 use OAuth::Lite::Token;
 use XML::Simple;
+use URI::Escape qw/uri_escape/;
+
+my $ATOM_URL = 'http://b.hatena.ne.jp/atom';
+my $ATOM_EDIT_URL = $ATOM_URL . '/edit/';
 
 sub new {
     my ($class, $params) = @_;
@@ -39,7 +43,7 @@ sub init {
 
     my $res = $consumer->request(
         method => 'GET',
-        url => 'http://b.hatena.ne.jp/atom',
+        url => $ATOM_URL,
         token => $token,
         params => {},
     );
@@ -97,13 +101,13 @@ sub post {
 
     my $res_hash = XML::Simple->new->XMLin($res->decoded_content, ForceArray => 1, KeyAttr => {'link' => 'rel'});
 
-    my $post_id = $res_hash->{id}[0];
     my $post_title = encode('utf-8', $res_hash->{title}[0]);
     my $post_url = $res_hash->{link}->{alternate}->{href};
     my $post_edit_url = $res_hash->{link}->{'service.edit'}->{href};
+    my ($post_eid) = $post_edit_url =~ /(\d+)$/;
 
     return {
-        id => $post_id,
+        eid => $post_eid,
         title => $post_title,
         post_url => $post_url,
         edit_url => $post_edit_url,
@@ -113,12 +117,18 @@ sub post {
 sub delete {
     my ($self, $edit_url) = @_;
 
+    my $url = $edit_url;
+    if ($edit_url =~ /^\d+$/) {
+        # eidの場合URL付与
+        $url = $ATOM_EDIT_URL . $edit_url;
+    }
+
     my $consumer = $self->{consumer};
     my $token = $self->{token};
 
     my $res = $consumer->request(
         method => 'DELETE',
-        url => $edit_url,
+        url => $url,
         token => $token,
     );
 

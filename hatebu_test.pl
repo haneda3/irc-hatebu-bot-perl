@@ -14,11 +14,14 @@ my $irc_channels = $irc_conf->{channels};
 my $hatebu_ngwords = $hatebu_conf->{ngwords};
 
 my $a = Hatebu->new($hatebu_conf->{oauth});
-#my $post_res = $a->post('http://www.google.com');
-#dump $post_res;
-#print $post_res->{title};
+
 $a->init();
 my $res = $a->post('http://www.google.com');
 dump $res;
-$a->delete($res->{edit_url});
+my $eid = $res->{eid};
+
+#$a->delete($res->{edit_url});
+$res = $a->delete($eid);
+#$res = $a->delete('http://www.google.com');
+dump $res;
 
