@@ -9,6 +9,9 @@ use Encode;
 use WWW::Mechanize;
 use URI;
 use OAuth::Lite::Consumer;
+
+use FindBin;
+use lib "$FindBin::Bin/lib";
 use Hatebu;
 
 my $ERROR_HATEBUNG_MSG = "はてブ禁止でした";

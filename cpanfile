@@ -5,3 +5,6 @@ requires 'WWW::Mechanize';
 requires 'XML::Simple';
 requires 'OAuth::Lite::Consumer';
 
+on test => sub {
+    requires 'Test::Perl::Critic';
+};

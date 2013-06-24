@@ -1,4 +1,3 @@
-#!/usr/bin/env perl
 package Hatebu;
 
 use strict;
@@ -49,7 +48,7 @@ sub init {
     );
 
     unless ($res->is_success) {
-        return undef;
+        return;
     }
 
     my $xml = XML::Simple->new->XMLin($res->decoded_content, ForceArray => 1, KeyAttr => {'link' => 'rel'});
@@ -96,7 +95,7 @@ sub post {
     );
 
     unless ($res->is_success) {
-        return undef;
+        return;
     }
 
     my $res_hash = XML::Simple->new->XMLin($res->decoded_content, ForceArray => 1, KeyAttr => {'link' => 'rel'});
@@ -133,7 +132,7 @@ sub delete {
     );
 
     unless ($res->is_success) {
-        return undef;
+        return;
     }
 
     return 1;

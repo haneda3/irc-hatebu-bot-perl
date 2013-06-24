@@ -1,7 +1,12 @@
+#!/usr/bin/env perl
 use strict;
-use Hatebu;
+use warnings;
 use Data::Dump qw/dump/;
 use Data::Dumper;
+
+use FindBin;
+use lib "$FindBin::Bin/lib";
+use Hatebu;
 
 my $irc_conf = do 'config.irc.pl' or die "$!";
 my $hatebu_conf = do 'config.hatebu.pl' or die "$!";
