@@ -130,7 +130,7 @@ sub get_url_from_message {
 sub get_title_from_url {
     my ($url) = @_;
 
-    my $mech = WWW::Mechanize->new();
+    my $mech = WWW::Mechanize->new(ssl_opts => { verify_hostname => 0 });
     my $res = $mech->get( $url );
 
     my $title = undef;
