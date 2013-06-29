@@ -35,61 +35,88 @@ my $hatebu_ngwords = $hatebu_conf->{ngwords};
 my $ac  = AnyEvent->condvar;
 my $irc = new AnyEvent::IRC::Client;
 
-# SSL使用時？
-#$irc->enable_ssl;
-$irc->connect($irc_server->{host}, $irc_server->{port}, {
-  nick => $irc_server->{nick}, user => $irc_server->{user}, real => $irc_server->{real}
-});
-
-foreach my $name (keys $irc_channels) {
-  my $password = $irc_channels->{$name}->{password} // '';
-  $irc->send_srv("JOIN", "#$name", $password);
-};
-
-$irc->reg_cb( connect    => sub { say "connected"; } );
-$irc->reg_cb( registered => sub { say "registered"; } );
-$irc->reg_cb( disconnect => sub { say "disconnet"; } );
-$irc->reg_cb(
-    publicmsg => sub {
-        my ($irc, $channel, $msg) = @_;
-
-        return if ($msg->{command} eq "NOTICE");
-
-        my $message = $msg->{params}->[1] // '';
-
-        if (get_delete_message($irc->nick, $message)) {
-            $irc->send_chan($channel, "NOTICE", $channel, "delete ok");
-            return;
-        }
-
-        my $url = get_url_from_message($message);
-        if ($url) {
-            my $title = get_title_from_url($url);
-            say $url, $title;
-
-            $irc->send_chan($channel, "NOTICE", $channel, "$TITLE_MSG $title");
-
-            if (is_hatebu_ng($message)) {
-                return;
-            }
-
-            if (is_contain_ngword($message)) {
-                return;
-            }
-
-            my $hatebu = Hatebu->new($hatebu_oauth);
-            $hatebu->init();
-            my $result = $hatebu->post($url);
-            if ($result) {
-                $irc->send_chan($channel, "NOTICE", $channel, "$SUCCESS_MSG $result->{eid} $result->{post_url}");
-            }
-        }
-    },
-    irc_notice => sub {
-    },
+sub irc_wait_connect {
+my $t;
+say "timer_start";
+$t = AnyEvent->timer(
+    after => 5,
+    cb => sub {
+        #$ac->send;
+        irc_connect();
+        undef $t;
+    }
 );
+}
 
+irc_wait_connect;
 $ac->recv;
+
+sub irc_connect {
+    say "irc_connect";
+    # SSL使用時？
+    #$irc->enable_ssl;
+    $irc->connect($irc_server->{host}, $irc_server->{port}, {
+            nick => $irc_server->{nick}, user => $irc_server->{user}, real => $irc_server->{real}
+        });
+
+    foreach my $name (keys $irc_channels) {
+        my $password = $irc_channels->{$name}->{password} // '';
+        $irc->send_srv("JOIN", "#$name", $password);
+    };
+
+    $irc->reg_cb( connect    => sub { say "connected"; } );
+    $irc->reg_cb( registered => sub { say "registered";} );
+    $irc->reg_cb(
+        disconnect => sub {
+            say "disconnect";
+            irc_wait_connect;
+        }
+    );
+    $irc->reg_cb(
+        publicmsg => sub {
+            my ($irc, $channel, $msg) = @_;
+
+            return if ($msg->{command} eq "NOTICE");
+
+            my $message = $msg->{params}->[1] // '';
+
+            if (get_delete_message($irc->nick, $message)) {
+                $irc->send_chan($channel, "NOTICE", $channel, "delete ok");
+                return;
+            }
+
+            my $url = get_url_from_message($message);
+            if ($url) {
+                my $title = get_title_from_url($url);
+                say $url, $title;
+
+                $irc->send_chan($channel, "NOTICE", $channel, "$TITLE_MSG $title");
+
+                # '#hoge' -> 'hoge'
+                my $cn = substr($channel, 1);
+                if (is_hatebu_ng_channel($irc_channels->{$cn})) {
+                    return;
+                }
+                if (is_hatebu_ng_message($message)) {
+                    return;
+                }
+
+                if (is_contain_ngword($message)) {
+                    return;
+                }
+
+                my $hatebu = Hatebu->new($hatebu_oauth);
+                $hatebu->init();
+                my $result = $hatebu->post($url);
+                if ($result) {
+                    $irc->send_chan($channel, "NOTICE", $channel, "$SUCCESS_MSG $result->{eid} $result->{post_url}");
+                }
+            }
+        },
+        irc_notice => sub {
+        },
+    );
+}
 
 sub get_delete_message {
     my ($nick, $message) = @_;
@@ -115,7 +142,7 @@ sub get_delete_message {
 sub get_url_from_message {
   my ($url) = @_;
 
-  if ($url =~ /((http|https):\/\/\S+)\s*/) {
+  if ($url =~ m{((http|https)://[\w/@.,%-_~=\$\?!*|]+)[\s　]*}) {
     my $u = URI->new($1);
     my $host = $u->host;
     if ($host =~ /^[0-9.]+$/) {
@@ -140,7 +167,19 @@ sub get_title_from_url {
     return $title;
 }
 
-sub is_hatebu_ng {
+sub is_hatebu_ng_channel {
+    my ($channel) = @_;
+
+    if (exists($channel->{hatebu})) {
+        if ($channel->{hatebu} == 0) {
+            return 1;
+        }
+    }
+
+    return;
+}
+
+sub is_hatebu_ng_message {
     # !付きは はてブ禁止
     my ($msg) = @_;
     if ($msg =~ /.*!.*/) {
