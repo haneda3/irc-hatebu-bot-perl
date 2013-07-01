@@ -76,11 +76,14 @@ sub irc_connect {
         publicmsg => sub {
             my ($irc, $channel, $msg) = @_;
 
-            return if ($msg->{command} eq "NOTICE");
-
+            my $is_notice = $msg->{command} eq "NOTICE";
             my $message = $msg->{params}->[1] // '';
 
             if (get_delete_message($irc->nick, $message)) {
+                if ($is_notice) {
+                    return;
+                }
+
                 $irc->send_chan($channel, "NOTICE", $channel, "delete ok");
                 return;
             }
@@ -97,6 +100,10 @@ sub irc_connect {
                     $irc->send_chan($channel, "NOTICE", $channel, "$TITLE_MSG $title");
                 }
                 say $url, $title // '';
+
+                if ($is_notice) {
+                    return;
+                }
 
                 # '#hoge' -> 'hoge'
                 my $cn = substr($channel, 1);
