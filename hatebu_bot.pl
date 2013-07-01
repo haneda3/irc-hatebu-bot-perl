@@ -87,10 +87,16 @@ sub irc_connect {
 
             my $url = get_url_from_message($message);
             if ($url) {
-                my $title = get_title_from_url($url);
-                say $url, $title;
+                my $detail = get_detail_from_url($url);
+                unless ($detail->{success}) {
+                    return;
+                }
 
-                $irc->send_chan($channel, "NOTICE", $channel, "$TITLE_MSG $title");
+                my $title = $detail->{title};
+                if ($title) {
+                    $irc->send_chan($channel, "NOTICE", $channel, "$TITLE_MSG $title");
+                }
+                say $url, $title // '';
 
                 # '#hoge' -> 'hoge'
                 my $cn = substr($channel, 1);
@@ -154,17 +160,20 @@ sub get_url_from_message {
   return undef;
 }
 
-sub get_title_from_url {
+sub get_detail_from_url {
     my ($url) = @_;
 
     my $mech = WWW::Mechanize->new(ssl_opts => { verify_hostname => 0 });
     my $res = $mech->get( $url );
 
     my $title = undef;
-    if ($res->code == 200) {
-      $title = encode('utf-8', $mech->title);
+    if ($mech->success) {
+        $title = encode('utf-8', $mech->title);
     }
-    return $title;
+    return {
+        success => $mech->success,
+        title => $title,
+    }
 }
 
 sub is_hatebu_ng_channel {
