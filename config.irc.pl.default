@@ -2,12 +2,12 @@
   server => {
     host => 'chat.au.freenode.net',
     port => '6667',
-    nick => 'akachoh',
-    user => 'akachoh',
-    real => 'akachoh',
+    nick => 'hatebubot',
+    user => 'hatebubot',
+    real => 'hatebubot',
   },
   channels => {
-    testakachoh => {
+    testbot => {
       password => 'PASSWORD',
     },
     testhaneda => {},
