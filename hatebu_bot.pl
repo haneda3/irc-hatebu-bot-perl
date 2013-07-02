@@ -32,24 +32,19 @@ my $irc_channels = $irc_conf->{channels};
 my $hatebu_oauth = $hatebu_conf->{oauth};
 my $hatebu_ngwords = $hatebu_conf->{ngwords};
 
-my $ac  = AnyEvent->condvar;
-my $irc = new AnyEvent::IRC::Client;
+my $ac;
+my $irc;
 
-sub irc_wait_connect {
-my $t;
-say "timer_start";
-$t = AnyEvent->timer(
-    after => 5,
-    cb => sub {
-        #$ac->send;
-        irc_connect();
-        undef $t;
-    }
-);
+while (1) {
+    sleep 3;
+
+    $ac = AnyEvent->condvar;
+    $irc = AnyEvent::IRC::Client->new;
+
+    irc_connect();
+
+    $ac->recv;
 }
-
-irc_wait_connect;
-$ac->recv;
 
 sub irc_connect {
     say "irc_connect";
@@ -69,7 +64,7 @@ sub irc_connect {
     $irc->reg_cb(
         disconnect => sub {
             say "disconnect";
-            irc_wait_connect;
+            $ac->send;
         }
     );
     $irc->reg_cb(
