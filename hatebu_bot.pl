@@ -122,20 +122,19 @@ sub irc_connect {
                 return;
             }
 
+            if ($message =~ /パスワード/) {
+                $irc->send_chan($channel, "NOTICE", $channel, "おしえてーーーーー（＾ー＾）");
+                return;
+            }
+
             if (get_me_message($irc->nick, $message)) {
                 if ($is_notice) {
                     return;
                 }
 
-                my $m = "";
-                if ($message =~ /パスワード/) {
-                    $m = "おしえてーーーーー（＾ー＾）";
-                } else {
-                    $m = << "HELP_MSG";
+                my $m = << "HELP_MSG";
 はてぶ削除したい delete <はてぶID>
 HELP_MSG
-                }
-
                 $irc->send_chan($channel, "NOTICE", $channel, $m);
 
                 return;
