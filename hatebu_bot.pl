@@ -119,7 +119,27 @@ sub irc_connect {
                 if ($result) {
                     $irc->send_chan($channel, "NOTICE", $channel, "$SUCCESS_MSG $result->{eid} $result->{post_url}");
                 }
+                return;
             }
+
+            if (get_me_message($irc->nick, $message)) {
+                if ($is_notice) {
+                    return;
+                }
+
+                my $m = "";
+                if ($message =~ /パスワード/) {
+                    $m = "おしえてーーーーー（＾ー＾）";
+                } else {
+                    $m = << "HELP_MSG";
+はてぶ削除したい delete <はてぶID>
+HELP_MSG
+                }
+
+                $irc->send_chan($channel, "NOTICE", $channel, $m);
+
+                return;
+             }
         },
         irc_notice => sub {
         },
@@ -146,6 +166,15 @@ sub get_delete_message {
     return undef;
 }
 
+sub get_me_message {
+    my ($nick, $message) = @_;
+
+    if ($message =~ /$nick/) {
+        return 1;
+    }
+
+    return undef;
+}
 
 sub get_url_from_message {
   my ($url) = @_;
