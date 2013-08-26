@@ -46,6 +46,13 @@ while (1) {
     $ac->recv;
 }
 
+sub _join_channels {
+    foreach my $name (keys $irc_channels) {
+        my $password = $irc_channels->{$name}->{password} // '';
+        $irc->send_srv("JOIN", "#$name", $password);
+    };
+}
+
 sub irc_connect {
     say "irc_connect";
     # SSL使用時？
@@ -54,10 +61,8 @@ sub irc_connect {
             nick => $irc_server->{nick}, user => $irc_server->{user}, real => $irc_server->{real}
         });
 
-    foreach my $name (keys $irc_channels) {
-        my $password = $irc_channels->{$name}->{password} // '';
-        $irc->send_srv("JOIN", "#$name", $password);
-    };
+    _join_channels();
+
 
     $irc->reg_cb( connect    => sub { say "connected"; } );
     $irc->reg_cb( registered => sub { say "registered";} );
@@ -141,6 +146,12 @@ HELP_MSG
              }
         },
         irc_notice => sub {
+        },
+        irc_kick => sub {
+            my ($self, $msg) = @_;
+            my $chan        = $msg->{params}->[0];
+
+            _join_channels();
         },
     );
 }
