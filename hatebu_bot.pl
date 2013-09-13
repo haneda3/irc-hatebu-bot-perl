@@ -131,6 +131,10 @@ sub irc_connect {
                 $irc->send_chan($channel, "NOTICE", $channel, "おしえてーーーーー（＾ー＾）");
                 return;
             }
+            if ($message =~ /なると/) {
+                $irc->send_chan($channel, "NOTICE", $channel, "ちょうだいーーーーー（＾ー＾）");
+                return;
+            }
 
             if (get_me_message($irc->nick, $message)) {
                 if ($is_notice) {
