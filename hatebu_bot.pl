@@ -100,8 +100,7 @@ AnySan->register_listener(
                 return if ($is_notice);
 
                 # '#hoge' -> 'hoge'
-                my $cn = substr($channel, 1);
-                return if is_hatebu_ng_channel($irc_channels->{$cn});
+                return if is_hatebu_ng_channel($irc_channels->{$channel});
                 return if is_hatebu_ng_message($message);
                 return if is_contain_ngword($message);
 

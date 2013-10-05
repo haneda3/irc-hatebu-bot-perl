@@ -7,10 +7,10 @@
     real => 'hatebubot',
   },
   channels => {
-    testbot => {
+    "#testbot" => {
       password => 'PASSWORD',
     },
-    testhaneda => {},
+    "#testhaneda" => {},
   },
 };
 
