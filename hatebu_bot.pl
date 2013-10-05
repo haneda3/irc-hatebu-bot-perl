@@ -91,7 +91,7 @@ AnySan->register_listener(
                     return;
                 }
 
-                my $title = $detail->{title};
+                my $title = decode_utf8($detail->{title});
                 if ($title) {
                     $receive->send_reply("$TITLE_MSG $title");
                 }
