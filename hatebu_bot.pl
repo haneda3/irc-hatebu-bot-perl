@@ -1,15 +1,14 @@
 #!/usr/bin/env perl
 use strict;
 use warnings;
-use feature 'say';
-use Data::Dump qw/dump/;
-use AnyEvent;
-use AnyEvent::IRC::Client;
+use utf8;
+use AnySan;
+use AnySan::Provider::IRC;
 use Encode;
 use WWW::Mechanize;
 use URI;
 use OAuth::Lite::Consumer;
-
+use Data::Dumper;
 use FindBin;
 use lib "$FindBin::Bin/lib";
 use Hatebu;
@@ -24,67 +23,64 @@ my $SUCCESS_MSG = "【はてブした】";
 my $irc_conf = do 'config.irc.pl' or die "$!";
 my $hatebu_conf = do 'config.hatebu.pl' or die "$!";
 
-dump($irc_conf);
-dump($hatebu_conf);
+#dump($irc_conf);
+#dump($hatebu_conf);
 
 my $irc_server = $irc_conf->{server};
 my $irc_channels = $irc_conf->{channels};
 my $hatebu_oauth = $hatebu_conf->{oauth};
 my $hatebu_ngwords = $hatebu_conf->{ngwords};
 
-my $ac;
-my $irc;
+my $last_added_hatebu_id = undef;
 
-while (1) {
-    sleep 3;
-
-    $ac = AnyEvent->condvar;
-    $irc = AnyEvent::IRC::Client->new;
-
-    irc_connect();
-
-    $ac->recv;
+sub _create_channelstr {
+    my ($chname) = @_;
+    my $password = $irc_channels->{$chname}->{password} // '';
+    return "$chname $password";
 }
 
-sub _join_channels {
-    foreach my $name (keys $irc_channels) {
-        my $password = $irc_channels->{$name}->{password} // '';
-        $irc->send_srv("JOIN", "#$name", $password);
-    };
+my $channels = {};
+foreach my $name (keys $irc_channels) {
+    my $cs = _create_channelstr($name);
+    $channels->{$cs} = {};
 }
 
-sub irc_connect {
-    say "irc_connect";
-    # SSL使用時？
-    #$irc->enable_ssl;
-    $irc->connect($irc_server->{host}, $irc_server->{port}, {
-            nick => $irc_server->{nick}, user => $irc_server->{user}, real => $irc_server->{real}
-        });
+my $irc = irc
+$irc_server->{host},
+port => $irc_server->{port},
+nickname => $irc_server->{nick},
+recive_commands => ['KICK', 'PRIVMSG', 'NOTICE'],
+channels => $channels;
 
-    _join_channels();
+AnySan->register_listener(
+    echo => {
+        cb => sub {
+            my $receive = shift;
+            my $message = decode_utf8($receive->message);
+            my $nick = $receive->nickname;
+            my $channel = $receive->{attribute}->{channel} // '';
+            my $is_notice = ($receive->{attribute}->{command} // '') eq 'NOTICE' ? 1 : 0;
 
+            if ($receive->{attribute}->{command} eq 'KICK') {
+                $irc->join_channel(_create_channelstr($channel));
+                return;
+            }
 
-    $irc->reg_cb( connect    => sub { say "connected"; } );
-    $irc->reg_cb( registered => sub { say "registered";} );
-    $irc->reg_cb(
-        disconnect => sub {
-            say "disconnect";
-            $ac->send;
-        }
-    );
-    $irc->reg_cb(
-        publicmsg => sub {
-            my ($irc, $channel, $msg) = @_;
-
-            my $is_notice = $msg->{command} eq "NOTICE";
-            my $message = $msg->{params}->[1] // '';
-
-            if (get_delete_message($irc->nick, $message)) {
-                if ($is_notice) {
-                    return;
+            my $did = get_delete_id_from_message($nick, $message);
+            if ($did) {
+                if ($did == -1) {
+                    unless ($last_added_hatebu_id) {
+                        $receive->send_reply("消すモノないよ");
+                        return;
+                    }
+                    $did = $last_added_hatebu_id;
                 }
-
-                $irc->send_chan($channel, "NOTICE", $channel, "delete ok");
+                if (_delete_hatebu($did)) {
+                    $receive->send_reply("delete ok $did");
+                    $last_added_hatebu_id = undef;
+                } else {
+                    $receive->send_reply("fail");
+                }
                 return;
             }
 
@@ -97,84 +93,70 @@ sub irc_connect {
 
                 my $title = $detail->{title};
                 if ($title) {
-                    $irc->send_chan($channel, "NOTICE", $channel, "$TITLE_MSG $title");
+                    $receive->send_reply("$TITLE_MSG $title");
                 }
-                say $url, $title // '';
+                #say $url, $title // '';
 
-                if ($is_notice) {
-                    return;
-                }
+                return if ($is_notice);
 
                 # '#hoge' -> 'hoge'
                 my $cn = substr($channel, 1);
-                if (is_hatebu_ng_channel($irc_channels->{$cn})) {
-                    return;
-                }
-                if (is_hatebu_ng_message($message)) {
-                    return;
-                }
-
-                if (is_contain_ngword($message)) {
-                    return;
-                }
+                return if is_hatebu_ng_channel($irc_channels->{$cn});
+                return if is_hatebu_ng_message($message);
+                return if is_contain_ngword($message);
 
                 my $hatebu = Hatebu->new($hatebu_oauth);
                 $hatebu->init();
                 my $result = $hatebu->post($url);
                 if ($result) {
-                    $irc->send_chan($channel, "NOTICE", $channel, "$SUCCESS_MSG $result->{eid} $result->{post_url}");
+                    $last_added_hatebu_id = $result->{eid};
+                    $receive->send_reply("$SUCCESS_MSG $result->{eid} $result->{post_url}");
                 }
                 return;
             }
 
             if ($message =~ /パスワード/) {
-                $irc->send_chan($channel, "NOTICE", $channel, "おしえてーーーーー（＾ー＾）");
+                $receive->send_reply("おしえてーーーーーa（＾ー＾）");
                 return;
             }
             if ($message =~ /なると/) {
-                $irc->send_chan($channel, "NOTICE", $channel, "ちょうだいーーーーー（＾ー＾）");
+                $receive->send_reply("ちょうだいーーーーー（＾ー＾）");
                 return;
             }
 
-            if (get_me_message($irc->nick, $message)) {
+            if (get_me_message($nick, $message)) {
                 if ($is_notice) {
                     return;
                 }
 
-                my $m = << "HELP_MSG";
-はてぶ削除したい delete <はてぶID>
-HELP_MSG
-                $irc->send_chan($channel, "NOTICE", $channel, $m);
-
+                $receive->send_reply('削除したい delete <はてブID>');
+                $receive->send_reply('直前の削除したい cancel|yame|やめ|やっぱやめ');
                 return;
-             }
-        },
-        irc_notice => sub {
-        },
-        irc_kick => sub {
-            my ($self, $msg) = @_;
-            my $chan        = $msg->{params}->[0];
-
-            _join_channels();
-        },
-    );
-}
-
-sub get_delete_message {
-    my ($nick, $message) = @_;
-
-    if ($message =~ /$nick:*\s+(\w+)\s+(\w+)/) {
-        my $command = $1;
-        my $id = $2;
-
-        if ($command =~ /delete/) {
-            my $hatebu = Hatebu->new($hatebu_oauth);
-            $hatebu->init();
-            my $result = $hatebu->delete($id);
-            if ($result) {
-                return 1;
             }
         }
+    }
+);
+
+AnySan->run;
+
+sub _delete_hatebu {
+    my ($eid) = @_;
+
+    my $hatebu = Hatebu->new($hatebu_oauth);
+    $hatebu->init();
+    return $hatebu->delete($eid);
+}
+
+sub get_delete_id_from_message {
+    my ($nick, $message) = @_;
+
+    if ($message =~ /$nick:*\s+(cancel|yame|やめ|やっぱやめ)/) {
+        return -1;
+    }
+
+    if ($message =~ /$nick:*\s+delete\s+(\w+)/) {
+        my $id = $1;
+        return $id;
     }
 
     return undef;
