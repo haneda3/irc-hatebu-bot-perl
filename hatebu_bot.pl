@@ -123,7 +123,11 @@ AnySan->register_listener(
                 $receive->send_reply("ちょうだいーーーーー（＾ー＾）");
                 return;
             }
-
+            if ($message =~ /^(うざい|そうですか)$/) {
+                $irc->_send_raw(AnyEvent::IRC::Util::mk_msg(undef, 'KICK', $channel, 'nipack', encode_utf8('うざい')));
+                return;
+            }
+            
             if (get_me_message($nick, $message)) {
                 if ($is_notice) {
                     return;
